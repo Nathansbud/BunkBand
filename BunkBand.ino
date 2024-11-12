@@ -1,10 +1,10 @@
 #include <HCSR04.h>
-#define NUM_SENSORS 2
+#define NUM_SENSORS 1
 
-// HCSR04 sensors(7, new int[2]{11, 12}, 2); //new int[4]{9, 10, 11, 12}, 4);
+HCSR04 sensors(3, 2);
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(9600);
 }
 
 void loop() {
@@ -12,15 +12,9 @@ void loop() {
   for(int i = 0; i < NUM_SENSORS; i++) {
     Serial.print(i);
     Serial.print("-");
-    Serial.println(random(0, 80));
+    Serial.println(sensors.dist(i)); 
+    // Serial.println(random(0, 80));
   }
-
-  /* Preliminary setup for simply reading all the sensors */
-  // for(int i = 0; i < NUM_SENSORS; i++) {
-  //   Serial.print(i);
-  //   Serial.print("] Sensor Reading: ");
-  //   Serial.println(sensors.dist(i)); 
-  // }
 
   delay(50);
 }
