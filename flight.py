@@ -20,15 +20,16 @@ def sensor_loop():
     
 def flight_loop():
     # TODO: Crazyflie flight stuff!
-    
+
     # swarm = Crazyswarm()
     # crazyflies = swarm.allcfs.crazyflies
     # timeHelper = swarm.timeHelper
 
     # groupState = SimpleNamespace(crazyflies=crazyflies, timeHelper=timeHelper)
 
-    # # Takeoff method from blocklyTranslations
+    # Takeoff method from blocklyTranslations
     # takeoff(groupState, height=1.25, duration=3)
+    pass
 
 # Create threads for each loop
 t1 = threading.Thread(target=sensor_loop)
