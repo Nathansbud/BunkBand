@@ -32,18 +32,17 @@ while True:
     sensor_raw, value_raw = reading.split("-")
     sensor, value = int(sensor_raw), float(value_raw)
 
-    # print(value)
-
-    proposed = 0
-    if 0 < value <= 10:
+    proposed = 0    
+    # More conservative buckets
+    if 0 <= value <= 5:
         proposed = 1
-    elif 10 < value <= 25:
+    elif 5 < value <= 15:
         proposed = 2
-    elif 25 < value <= 40:
+    elif 15 < value <= 25:
         proposed = 3
-    elif 40 < value <= 60:
+    elif 25 < value <= 35:
         proposed = 4
-    elif 60 < value <= 100:
+    elif 35 < value <= 45:
         proposed = 5
     else:
         proposed = 0
@@ -54,13 +53,15 @@ while True:
         BUCKET = proposed
         COUNT = 1
     
-    if COUNT == 5 and ACTIVE != BUCKET:
+    if COUNT == 8 and ACTIVE != BUCKET:
         print(f"Changing active bucket to {proposed}...")
         ACTIVE = BUCKET
         
-        # Send the sensor update to Max
-        max_client.send_message(f"/sensor/{sensor}", BUCKET - 1)
-        # Send message TO THE ROS device!
-        _ = requests.get(
-            f"http://{ROS_IP}:{ROS_PORT}/sensor/{sensor}/{BUCKET-1}"
-        )
+        # if we have an activity reading, change our locale
+        if ACTIVE != 0:
+            # Send the sensor update to Max
+            max_client.send_message(f"/sensor/{sensor}", BUCKET - 1)
+            # Send message TO THE ROS device!
+            _ = requests.get(
+                f"http://{ROS_IP}:{ROS_PORT}/sensor/{sensor}/{BUCKET-1}"
+            )

@@ -1,17 +1,30 @@
-import threading
 import queue
+import signal
+import sys
+import threading
+import time
 
 import numpy as np
-from crazyflie_py import Crazyswarm
 
+from crazyflie_py import Crazyswarm
 from http.server import HTTPServer, SimpleHTTPRequestHandler
 
+HAS_EXITED = False
+SURPRESS_SYSTEM_LOGS = True
 DIRECTORY = "."
+
 msg_queue = queue.Queue(maxsize=0)
+
 
 class RequestHandler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
+
+    def log_message(self, format: str, *args) -> None:
+        if SURPRESS_SYSTEM_LOGS:
+            return
+
+        return super().log_message(format, *args)
 
     def do_GET(self):
         if self.path.startswith("/sensor/"):
@@ -46,7 +59,7 @@ def command_receiver():
 
 
 def test_flight_loop():
-    Z = 1.0
+    BASE_HEIGHT = 0.5
 
     swarm = Crazyswarm()
     timeHelper = swarm.timeHelper
@@ -56,31 +69,53 @@ def test_flight_loop():
 
     # Take off all the crazyflies
     for cf in crazyflies:
-        cf.takeoff(targetHeight=Z, duration=1.0)
+        cf.takeoff(targetHeight=BASE_HEIGHT, duration=1.0)
 
     timeHelper.sleep(1.0)
 
-    for i in range(3):
-        for i in range(5):
-            # Z/2 to scale the received value to fit the lab
-            Z = 1.0 + (0.3125 * i)
+    get_height = lambda bucket: BASE_HEIGHT + 0.25 * bucket
 
-            duration = 1.0
-            for cf in allcfs.crazyflies:
-                pos = np.array(cf.initialPosition) + np.array([0, 0, Z])
-                cf.goTo(pos, 0.0, duration)
+    while not HAS_EXITED:
+        msg = None
 
-            # does this pause the loop or just the drone ?
-            timeHelper.sleep(duration)
+        try:
+            msg = msg_queue.get_nowait()
+        except queue.Empty:
+            # if we have no active available, simply ignore it and
+            pass
 
+        if msg:
+            relevant_cf = crazyflies[msg[0]]
+            relevant_cf.goTo(
+                relevant_cf.initialPosition + np.array([0, 0, get_height(msg[1])]),
+                0.0,
+                1.0,
+            )
+
+            timeHelper.sleep(1)
+
+    # if we have received an exit, land all cfs
     for cf in crazyflies:
         cf.land(0.04, 2.0)
 
     timeHelper.sleep(2.0)
-    pass
+
+
+def handle_exit():
+    global HAS_EXITED
+    HAS_EXITED = True
+
+    t1.join()
+    sys.exit(0)
 
 
 if __name__ == "__main__":
-    # t1 = threading.Thread(target=test_flight_loop)
+    t1 = threading.Thread(target=test_flight_loop)
     t2 = threading.Thread(target=command_receiver)
+
+    t1.start()
     t2.start()
+
+    # Attempt to land gracefully if a SIGTERM/SIGINT is triggered
+    # for s in [signal.SIGTERM, signal.SIGINT]:
+    #     signal.signal(s, lambda a, b: handle_exit())
