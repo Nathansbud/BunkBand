@@ -1,18 +1,22 @@
 import time
 import serial
+import requests
+
 
 from random import randint
 from pythonosc.udp_client import SimpleUDPClient
 
-SERVER_IP = "127.0.0.1"
+ROS_IP = "138.16.161.225"
+MAX_IP = "127.0.0.1"
+
+MAX_PORT = 6813
+ROS_PORT = 7001
 
 R4 = "/dev/tty.usbmodem4827E2E12D2C2"
 R2 = "/dev/cu.usbmodem142202"
 
 arduino = serial.Serial(port=R2, baudrate=9600)
-
-max_client = SimpleUDPClient(SERVER_IP, 6813)
-robot_client = SimpleUDPClient(SERVER_IP, 7001)
+max_client = SimpleUDPClient(MAX_IP, MAX_PORT)
 
 ACTIVE = 0
 
@@ -54,5 +58,9 @@ while True:
         print(f"Changing active bucket to {proposed}...")
         ACTIVE = BUCKET
         
+        # Send the sensor update to Max
         max_client.send_message(f"/sensor/{sensor}", BUCKET - 1)
-        robot_client.send_message(f"/sensor/{sensor}", BUCKET - 1)
+        # Send message TO THE ROS device!
+        _ = requests.get(
+            f"http://{ROS_IP}:{ROS_PORT}/sensor/{sensor}/{BUCKET-1}"
+        )

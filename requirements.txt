@@ -1,2 +1,4 @@
 pyserial
 python-osc
+requests
+numpy
