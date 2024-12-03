@@ -1,7 +1,7 @@
 #include <HCSR04.h>
 #define NUM_SENSORS 1
 
-HCSR04 sensors(3, 2);
+HCSR04 sensors(9, 10);
 
 void setup() {
   Serial.begin(9600);
