@@ -29,12 +29,29 @@ class RequestHandler(SimpleHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/sensor/"):
             self.handle_sensor()
+        elif self.path.startswith("/kinect"):
+            self.handle_kinect()
         else:
             self.respond(201, "idk what you did but i don't care")
 
     def handle_sensor(self):
         _, _, _sensor, _bucket = self.path.split("/")
         msg_queue.put((int(_sensor), int(_bucket)))
+
+        self.respond(200, "")
+
+    def handle_kinect(self):
+        if self.path.startswith == "kinect/exit":
+            handle_exit()
+        else:
+            queries = self.path.split("?")[1]
+            queries_split = queries.split("&")
+
+            x = float(queries_split[0].split("=")[1])
+            y = float(queries_split[1].split("=")[1])
+
+            print(f"Received kinect data: {x}, {y}")
+            # msg_queue.put((x, y))
 
         self.respond(200, "")
 
@@ -87,7 +104,7 @@ def test_flight_loop():
         if msg:
             relevant_cf = crazyflies[msg[0]]
             relevant_cf.goTo(
-                relevant_cf.initialPosition + np.array([0, 0, get_height(msg[1])]),
+                relevant_cf.initialPosition + np.array([, 0, get_height(msg[1])]),
                 0.0,
                 1.0,
             )

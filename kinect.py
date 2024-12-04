@@ -74,10 +74,10 @@ MAX_IP = "127.0.0.1"
 MAX_PORT = 6813
 ROS_PORT = 7001
 
-max_client = SimpleUDPClient(MAX_IP, MAX_PORT)
+# max_client = SimpleUDPClient(MAX_IP, MAX_PORT)
 
-def send_to_max(x, y):
-    max_client.send_message(f"/kinect", (x, y))
+# def send_to_max(x, y):
+#     max_client.send_message(f"/kinect", (x, y))
 
 def send_to_ros(x, y):
     _ = requests.get(
@@ -265,7 +265,7 @@ while True:
         cv2.putText(depth_image, str((round(mapped_pixel[0], 3), round(mapped_pixel[1], 3))), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
 
         # we can start sending the mapped pixel to the craziflie and max
-        send_to_max(mapped_pixel[0], mapped_pixel[1])
+        # send_to_max(mapped_pixel[0], mapped_pixel[1])
         send_to_ros(mapped_pixel[0], mapped_pixel[1])
 
     # draw the tracked pixel
@@ -281,6 +281,11 @@ while True:
 
     if key == ord('q'):
         break
+
+# exit the ROS device
+_ = requests.get(
+    f"http://{ROS_IP}:{ROS_PORT}/kinect/exit"
+)
 
 device.stop()
 device.close()
