@@ -13,15 +13,18 @@ MAX_PORT = 6813
 ROS_PORT = 7001
 
 R4 = "/dev/tty.usbmodem4827E2E12D2C2"
-R2 = "/dev/cu.usbmodem142202"
+R2 = "/dev/cu.usbmodem14102"
 
 arduino = serial.Serial(port=R2, baudrate=9600)
 max_client = SimpleUDPClient(MAX_IP, MAX_PORT)
 
-ACTIVE = 0
-
-BUCKET = 0
-COUNT = 0
+reading_map = {
+    i: {
+        "active": 0,
+        "bucket": 0,
+        "count": 0
+    } for i in range(4)
+}
 
 while True:
     reading = arduino.readline().decode().strip()
@@ -47,21 +50,25 @@ while True:
     else:
         proposed = 0
     
-    if proposed == BUCKET:
-        COUNT += 1
+    if proposed == reading_map[sensor]["bucket"]:
+        reading_map[sensor]["count"] += 1
     else:
-        BUCKET = proposed
-        COUNT = 1
+        reading_map[sensor]["bucket"] = proposed
+        reading_map[sensor]["count"] = 1
     
-    if COUNT == 8 and ACTIVE != BUCKET:
-        print(f"Changing active bucket to {proposed}...")
-        ACTIVE = BUCKET
+    if reading_map[sensor]["active"] != reading_map[sensor]["bucket"] and reading_map[sensor]["count"] == 8:
+        print(f"Changing S{sensor} active bucket to {proposed}...")
+        
+        reading_map[sensor]["active"] = reading_map[sensor]["bucket"]
         
         # if we have an activity reading, change our locale
-        if ACTIVE != 0:
-            # Send the sensor update to Max
-            max_client.send_message(f"/sensor/{sensor}", BUCKET - 1)
-            # Send message TO THE ROS device!
-            _ = requests.get(
-                f"http://{ROS_IP}:{ROS_PORT}/sensor/{sensor}/{BUCKET-1}"
-            )
+        if reading_map[sensor]["active"] != 0:
+            print("should send...")
+
+            # # Send the sensor update to Max
+            max_client.send_message(f"/sensor/{sensor}", reading_map[sensor]["bucket"] - 1)
+            # # Send message TO THE ROS device!
+            
+            # _ = requests.get(
+            #     f"http://{ROS_IP}:{ROS_PORT}/sensor/{sensor}/{reading_map[sensor]["bucket"]-1}"
+            # )
