@@ -9,6 +9,8 @@ from pylibfreenect2 import FrameType, Registration, Frame
 from pylibfreenect2 import createConsoleLogger, setGlobalLogger
 from pylibfreenect2 import LoggerLevel
 
+# ------------------------------- SETUP KINECT --------------------------------------- 
+
 try:
     from pylibfreenect2 import OpenGLPacketPipeline
     pipeline = OpenGLPacketPipeline()
@@ -59,6 +61,32 @@ bigdepth = Frame(1920, 1082, 4) if need_bigdepth else None
 color_depth_map = np.zeros((424, 512),  np.int32).ravel() \
     if need_color_depth_map else None
 
+# ----------------------------- END SETUP KINECT -------------------------------------
+
+# ------------------------------- SETUP COMMS ----------------------------------------
+
+from pythonosc.udp_client import SimpleUDPClient
+import requests
+
+ROS_IP = "138.16.161.225"
+MAX_IP = "127.0.0.1"
+
+MAX_PORT = 6813
+ROS_PORT = 7001
+
+max_client = SimpleUDPClient(MAX_IP, MAX_PORT)
+
+def send_to_max(x, y):
+    max_client.send_message(f"/kinect", (x, y))
+
+def send_to_ros(x, y):
+    _ = requests.get(
+        f"http://{ROS_IP}:{ROS_PORT}/kinect?x={x}&y={y}"
+    )
+
+# ----------------------------- END SETUP COMMS --------------------------------------
+
+# ------------------------------- KINECT FUNCTIONS -----------------------------------
 
 def limit_depth(depth, min_d=0, max_d=4500) -> np.ndarray:
     depth_copy = np.copy(depth)
@@ -111,6 +139,7 @@ def map_for_craziflie(tracked_pixel: tuple) -> tuple:
     width = top_right[0] - top_left[0]
     height = bottom_left[1] - top_left[1]
 
+
     distance_from_left = x - top_left[0]
     distance_from_top = y - top_left[1]
 
@@ -120,7 +149,14 @@ def map_for_craziflie(tracked_pixel: tuple) -> tuple:
     shifted_x = scaled_x - 0.5
     flipped_y = 1 - scaled_y
 
-    return (shifted_x, flipped_y)
+    clamped_x = max(-0.5, min(0.5, shifted_x))
+    clamped_y = max(0, min(1, flipped_y))
+
+    return (clamped_x, clamped_y)
+
+# ----------------------------- END KINECT FUNCTIONS ----------------------------------
+
+# ------------------------------- MAIN LOOP ------------------------------------------
 
 while True:
     frames = listener.waitForNewFrame()
@@ -139,6 +175,7 @@ while True:
     # visualization backend.
     # cv2.imshow("ir", ir.asarray() / 65535.)
     tracked_pixel = find_average_center(limit_depth(depth.asarray(), 500, 900))
+    mapped_pixel = map_for_craziflie(tracked_pixel)
 
     # draw a circle at the center of the tracked pixel onto the depth image
     depth_image = depth.asarray() / 4500.
@@ -146,6 +183,10 @@ while True:
 
     # get top left corner
     if callibration_step == 1:
+        cv2.putText(depth_image, "Top Left", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+        cv2.putText(depth_image, str(int(5 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+
+
         if time.time() - last_step_start > 5:
             top_left = tracked_pixel
             last_step_start = time.time()
@@ -155,6 +196,9 @@ while True:
     elif callibration_step == 2:
         # draw the top left corner
         cv2.circle(depth_image, (int(top_left[0]), int(top_left[1])), 5, (255, 0, 0), -1)
+
+        cv2.putText(depth_image, "Top Right", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+        cv2.putText(depth_image, str(int(5 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
 
         if time.time() - last_step_start > 5:
             top_right = tracked_pixel
@@ -172,6 +216,9 @@ while True:
     elif callibration_step == 3:
         # draw the top line
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(top_right[0]), int(top_left[1])), (255, 0, 0), 2)
+
+        cv2.putText(depth_image, "Bottom Left", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+        cv2.putText(depth_image, str(int(5 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
 
         if time.time() - last_step_start > 5:
             bottom_left = tracked_pixel
@@ -191,6 +238,9 @@ while True:
         # draw the left line
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(bottom_left[0]), int(bottom_left[1])), (255, 0, 0), 2)
 
+        cv2.putText(depth_image, "Bottom Right", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+        cv2.putText(depth_image, str(int(5 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+
         if time.time() - last_step_start > 5:
             bottom_right = tracked_pixel
             last_step_start = time.time()
@@ -205,33 +255,22 @@ while True:
             top_right = (right_x, top_right[1])
             bottom_right = (right_x, higher_y)
             bottom_left = (bottom_left[0], higher_y)
-    else:
+    elif callibration_step == 5:
         # draw square
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(top_right[0]), int(top_right[1])), (255, 0, 0), 2)
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(bottom_left[0]), int(bottom_left[1])), (255, 0, 0), 2)
         cv2.line(depth_image, (int(bottom_left[0]), int(bottom_left[1])), (int(bottom_right[0]), int(bottom_right[1])), (255, 0, 0), 2)
         cv2.line(depth_image, (int(bottom_right[0]), int(bottom_right[1])), (int(top_right[0]), int(top_right[1])), (255, 0, 0), 2)
-    
+
+        cv2.putText(depth_image, str((round(mapped_pixel[0], 3), round(mapped_pixel[1], 3))), (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+
+        # we can start sending the mapped pixel to the craziflie and max
+        send_to_max(mapped_pixel[0], mapped_pixel[1])
+        send_to_ros(mapped_pixel[0], mapped_pixel[1])
 
     # draw the tracked pixel
     cv2.circle(depth_image, (int(tracked_pixel[0]), int(tracked_pixel[1])), 5, (0, 0, 255), -1)
-
-    print(tracked_pixel)
-    print(map_for_craziflie(tracked_pixel))
-
     cv2.imshow("depth", depth_image)
-    
-
-    
-    # cv2.imshow("color", cv2.resize(color.asarray(),
-                                #    (int(1920 / 3), int(1080 / 3))))
-    # cv2.imshow("registered", registered.asarray(np.uint8))
-
-    # if need_bigdepth:
-    #     cv2.imshow("bigdepth", cv2.resize(bigdepth.asarray(np.float32),
-    #                                       (int(1920 / 3), int(1082 / 3))))
-    # if need_color_depth_map:
-    #     cv2.imshow("color_depth_map", color_depth_map.reshape(424, 512))
 
     listener.release(frames)
 
