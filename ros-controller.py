@@ -14,6 +14,7 @@ SURPRESS_SYSTEM_LOGS = True
 DIRECTORY = "."
 
 KINECT_CF_INDEX = 0
+KINECT_HZ = 100
 
 sensor_queue = queue.Queue(maxsize=0)
 kinect_queue = queue.Queue(maxsize=0)
@@ -126,18 +127,37 @@ def test_flight_loop():
         if kinect_msg:
             print(crazyflies)
             relevant_cf = crazyflies[KINECT_CF_INDEX]
-            print(relevant_cf)
+            
+
+            current_pos = relevant_cf.position()
+            target_pos = relevant_cf.initialPosition + np.array(
+                [get_kinect_x(kinect_msg[0]), 0, get_kinect_height(kinect_msg[1])]
+            )
+
+            distance_to_target = np.linalg.norm(target_pos - current_pos)
+            max_speed = 1.5 # m/s
+
+            max_distance = max_speed * (1 / KINECT_HZ)
+
+            # it has 0.01 seconds to reach the target
+            
+            # if the distance is too far from us, we need to move it closer
+            if distance_to_target > max_distance:
+                vector_to_target = target_pos - current_pos
+                unit_vector = vector_to_target / np.linalg.norm(vector_to_target)
+
+                unit_vector *= max_distance
+                target_pos = current_pos + unit_vector
+
+        
             relevant_cf.goTo(
-                relevant_cf.initialPosition
-                + np.array(
-                    [get_kinect_x(kinect_msg[0]), 0, get_kinect_height(kinect_msg[1])]
-                ),
+                target_pos,
                 0.0,
-                1.0,
+                1 / KINECT_HZ,
             )
 
         if kinect_msg or sensor_msg:
-            timeHelper.sleep(1)
+            timeHelper.sleep(1 / KINECT_HZ)
 
     # if we have received an exit, land all cfs
     for cf in crazyflies:
