@@ -159,6 +159,9 @@ def map_for_craziflie(tracked_pixel: tuple) -> tuple:
 
 # ------------------------------- MAIN LOOP ------------------------------------------
 
+time_of_last_send = None
+FREQUENCY = 100 # Hz
+
 while True:
     frames = listener.waitForNewFrame()
 
@@ -267,7 +270,9 @@ while True:
 
         # we can start sending the mapped pixel to the craziflie and max
         # send_to_max(mapped_pixel[0], mapped_pixel[1])
-        send_to_ros(mapped_pixel[0], mapped_pixel[1])
+        if time_of_last_send is None or time.time() - time_of_last_send > 1 / FREQUENCY:
+            time_of_last_send = time.time()
+            send_to_ros(mapped_pixel[0], mapped_pixel[1])
 
     # draw the tracked pixel
     cv2.circle(depth_image, (int(tracked_pixel[0]), int(tracked_pixel[1])), 5, (0, 0, 255), -1)
