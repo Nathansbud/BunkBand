@@ -80,6 +80,7 @@ ROS_PORT = 7001
 #     max_client.send_message(f"/kinect", (x, y))
 
 def send_to_ros(x, y):
+    print(f"Sending to ROS: {x}, {y}")
     _ = requests.get(
         f"http://{ROS_IP}:{ROS_PORT}/kinect?x={x}&y={y}"
     )
@@ -184,10 +185,10 @@ while True:
     # get top left corner
     if callibration_step == 1:
         cv2.putText(depth_image, "Top Left", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
-        cv2.putText(depth_image, str(int(5 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+        cv2.putText(depth_image, str(int(3 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
 
 
-        if time.time() - last_step_start > 5:
+        if time.time() - last_step_start > 3:
             top_left = tracked_pixel
             last_step_start = time.time()
             callibration_step = 2
@@ -198,9 +199,9 @@ while True:
         cv2.circle(depth_image, (int(top_left[0]), int(top_left[1])), 5, (255, 0, 0), -1)
 
         cv2.putText(depth_image, "Top Right", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
-        cv2.putText(depth_image, str(int(5 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+        cv2.putText(depth_image, str(int(3 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
 
-        if time.time() - last_step_start > 5:
+        if time.time() - last_step_start > 3:
             top_right = tracked_pixel
             last_step_start = time.time()
             callibration_step = 3
@@ -218,9 +219,9 @@ while True:
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(top_right[0]), int(top_left[1])), (255, 0, 0), 2)
 
         cv2.putText(depth_image, "Bottom Left", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
-        cv2.putText(depth_image, str(int(5 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+        cv2.putText(depth_image, str(int(3 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
 
-        if time.time() - last_step_start > 5:
+        if time.time() - last_step_start > 3:
             bottom_left = tracked_pixel
             last_step_start = time.time()
             callibration_step = 4
@@ -239,9 +240,9 @@ while True:
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(bottom_left[0]), int(bottom_left[1])), (255, 0, 0), 2)
 
         cv2.putText(depth_image, "Bottom Right", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
-        cv2.putText(depth_image, str(int(5 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
+        cv2.putText(depth_image, str(int(3 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
 
-        if time.time() - last_step_start > 5:
+        if time.time() - last_step_start > 3:
             bottom_right = tracked_pixel
             last_step_start = time.time()
             callibration_step = 5

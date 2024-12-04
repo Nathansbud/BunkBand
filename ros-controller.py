@@ -13,7 +13,10 @@ HAS_EXITED = False
 SURPRESS_SYSTEM_LOGS = True
 DIRECTORY = "."
 
-msg_queue = queue.Queue(maxsize=0)
+KINECT_CF_INDEX = 0
+
+sensor_queue = queue.Queue(maxsize=0)
+kinect_queue = queue.Queue(maxsize=0)
 
 
 class RequestHandler(SimpleHTTPRequestHandler):
@@ -36,12 +39,12 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
     def handle_sensor(self):
         _, _, _sensor, _bucket = self.path.split("/")
-        msg_queue.put((int(_sensor), int(_bucket)))
+        sensor_queue.put((int(_sensor), int(_bucket)))
 
         self.respond(200, "")
 
     def handle_kinect(self):
-        if self.path.startswith == "kinect/exit":
+        if self.path.startswith("/kinect/exit"):
             handle_exit()
         else:
             queries = self.path.split("?")[1]
@@ -51,7 +54,7 @@ class RequestHandler(SimpleHTTPRequestHandler):
             y = float(queries_split[1].split("=")[1])
 
             print(f"Received kinect data: {x}, {y}")
-            # msg_queue.put((x, y))
+            kinect_queue.put((x, y))
 
         self.respond(200, "")
 
@@ -92,23 +95,48 @@ def test_flight_loop():
 
     get_height = lambda bucket: BASE_HEIGHT + 0.25 * bucket
 
+    get_kinect_height = lambda z: BASE_HEIGHT + 1.5 * z
+    get_kinect_x = lambda x: 4 * x
+
     while not HAS_EXITED:
-        msg = None
+        sensor_msg = None
+        kinect_msg = None
 
         try:
-            msg = msg_queue.get_nowait()
+            sensor_msg = sensor_queue.get_nowait()
         except queue.Empty:
             # if we have no active available, simply ignore it and
             pass
 
-        if msg:
-            relevant_cf = crazyflies[msg[0]]
+        if sensor_msg:
+            relevant_cf = crazyflies[sensor_msg[0]]
             relevant_cf.goTo(
-                relevant_cf.initialPosition + np.array([, 0, get_height(msg[1])]),
+                relevant_cf.initialPosition
+                + np.array([0, 0, get_height(sensor_msg[1])]),
                 0.0,
                 1.0,
             )
 
+        try:
+            kinect_msg = kinect_queue.get_nowait()
+        except queue.Empty:
+            print("I am empty?")
+            pass
+
+        if kinect_msg:
+            print(crazyflies)
+            relevant_cf = crazyflies[KINECT_CF_INDEX]
+            print(relevant_cf)
+            relevant_cf.goTo(
+                relevant_cf.initialPosition
+                + np.array(
+                    [get_kinect_x(kinect_msg[0]), 0, get_kinect_height(kinect_msg[1])]
+                ),
+                0.0,
+                1.0,
+            )
+
+        if kinect_msg or sensor_msg:
             timeHelper.sleep(1)
 
     # if we have received an exit, land all cfs
