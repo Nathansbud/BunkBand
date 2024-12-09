@@ -4,6 +4,7 @@ import time
 import numpy as np
 import cv2
 import sys
+import os
 from pylibfreenect2 import Freenect2, SyncMultiFrameListener
 from pylibfreenect2 import FrameType, Registration, Frame
 from pylibfreenect2 import createConsoleLogger, setGlobalLogger
@@ -72,7 +73,7 @@ from pythonosc.udp_client import SimpleUDPClient
 import requests
 
 ROS_IP = "138.16.161.225"
-MAX_IP = "138.16.161.129"
+MAX_IP = "138.16.161.198"
 
 MAX_PORT = 6813
 ROS_PORT = 7001
@@ -119,7 +120,7 @@ def find_average_center(depth_map: np.ndarray) -> tuple:
     return (x_sum / num_pixels, y_sum / num_pixels)
 
 
-callibration_step = 0
+calibration_step = 0
 last_step_start = 0
 
 top_left = (0, 0)
@@ -137,7 +138,7 @@ def map_for_craziflie(tracked_pixel: tuple) -> tuple:
     # get the x and y coordinates of the tracked pixel
     x, y = tracked_pixel
 
-    if callibration_step != 5:
+    if calibration_step != 5:
         return None
     
     width = top_right[0] - top_left[0]
@@ -165,6 +166,14 @@ def map_for_craziflie(tracked_pixel: tuple) -> tuple:
 time_of_last_send = None
 FREQUENCY = 15 # Hz
 
+# if os.path.exists("calibration.txt"):
+#     with open("calibration.txt", "r") as f:
+#         lines = f.readlines()
+#         top_left, top_right, bottom_left, bottom_right = [[int(v) for v in l.strip().split(",")] for l in f.readlines()]
+#         calibration_step = 5
+# else:
+#     calibration_step = 0
+
 while True:
     frames = listener.waitForNewFrame()
 
@@ -189,7 +198,7 @@ while True:
     depth_image = cv2.cvtColor(depth_image, cv2.COLOR_GRAY2BGR)
 
     # get top left corner
-    if callibration_step == 1:
+    if calibration_step == 1:
         cv2.putText(depth_image, "Top Left", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
         cv2.putText(depth_image, str(int(3 - (time.time() - last_step_start))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 3, cv2.LINE_AA)
 
@@ -197,10 +206,10 @@ while True:
         if time.time() - last_step_start > 3:
             top_left = tracked_pixel
             last_step_start = time.time()
-            callibration_step = 2
+            calibration_step = 2
 
     # get top right corner
-    elif callibration_step == 2:
+    elif calibration_step == 2:
         # draw the top left corner
         cv2.circle(depth_image, (int(top_left[0]), int(top_left[1])), 5, (255, 0, 0), -1)
 
@@ -210,7 +219,7 @@ while True:
         if time.time() - last_step_start > 3:
             top_right = tracked_pixel
             last_step_start = time.time()
-            callibration_step = 3
+            calibration_step = 3
 
             # make sure the top left and top right corners are on the same y level
             lower_y = max(top_left[1], top_right[1])
@@ -220,7 +229,7 @@ while True:
             
 
     # get bottom left corner
-    elif callibration_step == 3:
+    elif calibration_step == 3:
         # draw the top line
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(top_right[0]), int(top_left[1])), (255, 0, 0), 2)
 
@@ -230,7 +239,7 @@ while True:
         if time.time() - last_step_start > 3:
             bottom_left = tracked_pixel
             last_step_start = time.time()
-            callibration_step = 4
+            calibration_step = 4
 
             # make sure the top left and bottom left corners are on the same x level
             right_x = max(top_left[0], bottom_left[0])
@@ -238,7 +247,7 @@ while True:
             bottom_left = (right_x, bottom_left[1])
 
     # get bottom right corner
-    elif callibration_step == 4:
+    elif calibration_step == 4:
         # draw the top line
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(top_right[0]), int(top_right[1])), (255, 0, 0), 2)
 
@@ -251,7 +260,7 @@ while True:
         if time.time() - last_step_start > 3:
             bottom_right = tracked_pixel
             last_step_start = time.time()
-            callibration_step = 5
+            calibration_step = 5
 
             # make sure the bottom left and bottom right corners are on the same y level
             higher_y = min(bottom_left[1], bottom_right[1])
@@ -263,12 +272,15 @@ while True:
             bottom_right = (right_x, higher_y)
             bottom_left = (bottom_left[0], higher_y)
 
+            # with open("calibration.txt", "w+") as f:
+            #     f.writelines([top_left, top_right, bottom_left, bottom_right])
+
             if USING_ROS:
                 requests.get(
                     f"http://{ROS_IP}:{ROS_PORT}/kinect/start"
                 )
 
-    elif callibration_step == 5:
+    elif calibration_step == 5:
         # draw square
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(top_right[0]), int(top_right[1])), (255, 0, 0), 2)
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(bottom_left[0]), int(bottom_left[1])), (255, 0, 0), 2)
@@ -294,7 +306,7 @@ while True:
 
     key = cv2.waitKey(delay=1)
     if key == ord(' '):
-        callibration_step += 1
+        calibration_step += 1
         last_step_start = time.time()
 
     if key == ord('q'):
