@@ -12,6 +12,8 @@ MAX_IP = "127.0.0.1"
 MAX_PORT = 6813
 ROS_PORT = 7001
 
+NETWORKED = False
+
 R4 = "/dev/tty.usbmodem4827E2E12D2C2"
 R2 = "/dev/cu.usbmodem14102"
 
@@ -56,7 +58,7 @@ while True:
         reading_map[sensor]["bucket"] = proposed
         reading_map[sensor]["count"] = 1
     
-    if reading_map[sensor]["active"] != reading_map[sensor]["bucket"] and reading_map[sensor]["count"] == 8:
+    if reading_map[sensor]["active"] != reading_map[sensor]["bucket"] and reading_map[sensor]["count"] == 5:
         print(f"Changing S{sensor} active bucket to {proposed}...")
         
         reading_map[sensor]["active"] = reading_map[sensor]["bucket"]
@@ -69,6 +71,7 @@ while True:
             max_client.send_message(f"/sensor/{sensor}", reading_map[sensor]["bucket"] - 1)
             # # Send message TO THE ROS device!
             
-            # _ = requests.get(
-            #     f"http://{ROS_IP}:{ROS_PORT}/sensor/{sensor}/{reading_map[sensor]["bucket"]-1}"
-            # )
+            if NETWORKED:
+                _ = requests.get(
+                    f"http://{ROS_IP}:{ROS_PORT}/sensor/{sensor}/{reading_map[sensor]['bucket']-1}"
+                )
