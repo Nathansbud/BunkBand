@@ -12,7 +12,7 @@ MAX_IP = "127.0.0.1"
 MAX_PORT = 6813
 ROS_PORT = 7001
 
-NETWORKED = False
+NETWORKED = True
 
 R4 = "/dev/tty.usbmodem4827E2E12D2C2"
 R2 = "/dev/cu.usbmodem14102"
