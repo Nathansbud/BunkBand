@@ -13,14 +13,40 @@ HAS_EXITED = False
 SURPRESS_SYSTEM_LOGS = True
 DIRECTORY = "."
 
-KINECT_CF_INDEX = 0
-KINECT_HZ = 100
+KINECT_CF_INDEX = 4
+
+def sort_crazyflies(cfs):
+    sorted_cfs = [None, None, None, None, None]
+
+    kinect_starting_pos = (0, 0.5, 0)
+    # sensor_starting_pos = [(-0.75, -0.5, 0), (0.25, -0.5, 0), (0.25, -0.5, 0), (0.75, -0.5, 0)]
+    sensor_starting_pos = [
+        (-0.75, -0.5, 0),
+    ]
+
+    for cf in cfs:
+        if cf.initialPosition == kinect_starting_pos:
+            sorted_cfs[KINECT_CF_INDEX] = cf
+        else:
+            i = sensor_starting_pos.index(cf.initialPosition)
+            sorted_cfs[i] = cf
+
+    return sorted_cfs
+
+ALL_SHOULD_TAKEOFF = False
+ALL_HAS_TAKENOFF = False
 
 sensor_queue = queue.Queue(maxsize=0)
 kinect_queue = queue.Queue(maxsize=0)
+# kinect_cmd = (x, y)
+
+start_time = None
+num_kinect_commands = 0
+KINECT_HZ = 8.6
 
 
 class RequestHandler(SimpleHTTPRequestHandler):
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=DIRECTORY, **kwargs)
 
@@ -40,14 +66,27 @@ class RequestHandler(SimpleHTTPRequestHandler):
 
     def handle_sensor(self):
         _, _, _sensor, _bucket = self.path.split("/")
-        sensor_queue.put((int(_sensor), int(_bucket)))
+
+        if ALL_HAS_TAKENOFF:
+            sensor_queue.put((int(_sensor), int(_bucket)))
 
         self.respond(200, "")
 
     def handle_kinect(self):
+        global start_time
+        global num_kinect_commands
+        global kinect_queue
+
         if self.path.startswith("/kinect/exit"):
             handle_exit()
+        elif self.path.startswith("/kinect/start"):
+            all_takeoff()
         else:
+            if start_time is None:
+                start_time = time.time()
+
+            num_kinect_commands += 1
+
             queries = self.path.split("?")[1]
             queries_split = queries.split("&")
 
@@ -55,6 +94,10 @@ class RequestHandler(SimpleHTTPRequestHandler):
             y = float(queries_split[1].split("=")[1])
 
             print(f"Received kinect data: {x}, {y}")
+            print(
+                f"Average frequency: ",
+                {num_kinect_commands / (time.time() - start_time)},
+            )
             kinect_queue.put((x, y))
 
         self.respond(200, "")
@@ -82,16 +125,19 @@ def command_receiver():
 def test_flight_loop():
     BASE_HEIGHT = 0.5
 
+    global ALL_SHOULD_TAKEOFF
+    global ALL_HAS_TAKENOFF
+    global kinect_queue
+
     swarm = Crazyswarm()
     timeHelper = swarm.timeHelper
     allcfs = swarm.allcfs
 
-    crazyflies = allcfs.crazyflies
+    crazyflies = sort_crazyflies(allcfs.crazyflies)
+
 
     # Take off all the crazyflies
-    for cf in crazyflies:
-        cf.takeoff(targetHeight=BASE_HEIGHT, duration=1.0)
-
+    
     timeHelper.sleep(1.0)
 
     get_height = lambda bucket: BASE_HEIGHT + 0.25 * bucket
@@ -100,6 +146,16 @@ def test_flight_loop():
     get_kinect_x = lambda x: 4 * x
 
     while not HAS_EXITED:
+        if ALL_SHOULD_TAKEOFF and not ALL_HAS_TAKENOFF:
+            for cf in crazyflies:
+                cf.takeoff(targetHeight=BASE_HEIGHT, duration=1.0)
+
+            ALL_HAS_TAKENOFF = True
+            timeHelper.sleep(1)
+        else:
+            timeHelper.sleep(0.1)
+            continue
+
         sensor_msg = None
         kinect_msg = None
 
@@ -115,32 +171,34 @@ def test_flight_loop():
                 relevant_cf.initialPosition
                 + np.array([0, 0, get_height(sensor_msg[1])]),
                 0.0,
-                1.0,
+                0.5,
             )
 
         try:
             kinect_msg = kinect_queue.get_nowait()
         except queue.Empty:
-            print("I am empty?")
             pass
 
         if kinect_msg:
-            print(crazyflies)
             relevant_cf = crazyflies[KINECT_CF_INDEX]
-            
 
             current_pos = relevant_cf.position()
+            print("current position", current_pos)
             target_pos = relevant_cf.initialPosition + np.array(
                 [get_kinect_x(kinect_msg[0]), 0, get_kinect_height(kinect_msg[1])]
             )
 
+            print("Target Pos Pre-Scaling: ", target_pos)
+            print("Current Pos: ", current_pos)
             distance_to_target = np.linalg.norm(target_pos - current_pos)
-            max_speed = 1.5 # m/s
+            # print("")
 
-            max_distance = max_speed * (1 / KINECT_HZ)
+            max_speed = 3.0  # m/s
+
+            max_distance = max_speed * (1.0 / KINECT_HZ)
 
             # it has 0.01 seconds to reach the target
-            
+
             # if the distance is too far from us, we need to move it closer
             if distance_to_target > max_distance:
                 vector_to_target = target_pos - current_pos
@@ -149,21 +207,28 @@ def test_flight_loop():
                 unit_vector *= max_distance
                 target_pos = current_pos + unit_vector
 
-        
-            relevant_cf.goTo(
-                target_pos,
-                0.0,
-                1 / KINECT_HZ,
-            )
+            print("Target Pos Post Scaling: ", target_pos)
+            relevant_cf.cmdPosition(target_pos)
+
+            print()
 
         if kinect_msg or sensor_msg:
-            timeHelper.sleep(1 / KINECT_HZ)
+            timeHelper.sleepForRate(KINECT_HZ)
 
     # if we have received an exit, land all cfs
     for cf in crazyflies:
-        cf.land(0.04, 2.0)
+        cf.notifySetpointsStop()
+        cf.land(0.04, 5.0)
 
-    timeHelper.sleep(2.0)
+    timeHelper.sleep(5.0)
+
+
+def all_takeoff():
+    global ALL_SHOULD_TAKEOFF
+    ALL_SHOULD_TAKEOFF = True
+
+    global ALL_HAS_TAKENOFF
+    ALL_HAS_TAKENOFF = False
 
 
 def handle_exit():

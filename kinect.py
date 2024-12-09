@@ -65,19 +65,22 @@ color_depth_map = np.zeros((424, 512),  np.int32).ravel() \
 
 # ------------------------------- SETUP COMMS ----------------------------------------
 
+USING_ROS = True
+USING_MAX = True
+
 from pythonosc.udp_client import SimpleUDPClient
 import requests
 
 ROS_IP = "138.16.161.225"
-MAX_IP = "127.0.0.1"
+MAX_IP = "138.16.161.129"
 
 MAX_PORT = 6813
 ROS_PORT = 7001
 
-# max_client = SimpleUDPClient(MAX_IP, MAX_PORT)
+max_client = SimpleUDPClient(MAX_IP, MAX_PORT)
 
-# def send_to_max(x, y):
-#     max_client.send_message(f"/kinect", (x, y))
+def send_to_max(x, y):
+    max_client.send_message(f"/kinect", (x, y))
 
 def send_to_ros(x, y):
     print(f"Sending to ROS: {x}, {y}")
@@ -160,7 +163,7 @@ def map_for_craziflie(tracked_pixel: tuple) -> tuple:
 # ------------------------------- MAIN LOOP ------------------------------------------
 
 time_of_last_send = None
-FREQUENCY = 100 # Hz
+FREQUENCY = 15 # Hz
 
 while True:
     frames = listener.waitForNewFrame()
@@ -259,6 +262,12 @@ while True:
             top_right = (right_x, top_right[1])
             bottom_right = (right_x, higher_y)
             bottom_left = (bottom_left[0], higher_y)
+
+            if USING_ROS:
+                requests.get(
+                    f"http://{ROS_IP}:{ROS_PORT}/kinect/start"
+                )
+
     elif callibration_step == 5:
         # draw square
         cv2.line(depth_image, (int(top_left[0]), int(top_left[1])), (int(top_right[0]), int(top_right[1])), (255, 0, 0), 2)
@@ -270,9 +279,12 @@ while True:
 
         # we can start sending the mapped pixel to the craziflie and max
         # send_to_max(mapped_pixel[0], mapped_pixel[1])
-        if time_of_last_send is None or time.time() - time_of_last_send > 1 / FREQUENCY:
+        if time_of_last_send is None or (time.time() - time_of_last_send) > 1.0 / FREQUENCY:
+            if USING_ROS:
+                send_to_ros(mapped_pixel[0], mapped_pixel[1])
+            if USING_MAX:
+                send_to_max(mapped_pixel[0], mapped_pixel[1])
             time_of_last_send = time.time()
-            send_to_ros(mapped_pixel[0], mapped_pixel[1])
 
     # draw the tracked pixel
     cv2.circle(depth_image, (int(tracked_pixel[0]), int(tracked_pixel[1])), 5, (0, 0, 255), -1)
