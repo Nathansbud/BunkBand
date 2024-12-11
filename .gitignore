@@ -1,0 +1,6 @@
+__pycache__/
+.idea/
+credentials/
+venv/
+.DS_Store
+calibration.txt
