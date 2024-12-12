@@ -25,7 +25,7 @@ reading_map = {
         "active": 0,
         "bucket": 0,
         "count": 0
-    } for i in range(4)
+    } for i in range(5)
 }
 
 while True:
@@ -39,16 +39,18 @@ while True:
 
     proposed = 0    
     # More conservative buckets
-    if 0 <= value <= 5:
+    if 0 <= value <= 4:
         proposed = 1
-    elif 5 < value <= 15:
+    elif 4 < value <= 12:
         proposed = 2
-    elif 15 < value <= 25:
+    elif 12 < value <= 20:
         proposed = 3
-    elif 25 < value <= 35:
+    elif 20 < value <= 30:
         proposed = 4
-    elif 35 < value <= 45:
+    elif 30 < value <= 40:
         proposed = 5
+    elif 40 <= value < 50:
+        proposed = 6
     else:
         proposed = 0
     
